@@ -12,7 +12,7 @@
  *  Please refer to Page 196~198, Section 8.2 of Yan Wei Min's Chinese book
  * "Data Structure -- C programming language".
 */
-// LAB2 EXERCISE 1: YOUR CODE
+// LAB2 EXERCISE 1: 2015011304
 // you should rewrite functions: `default_init`, `default_init_memmap`,
 // `default_alloc_pages`, `default_free_pages`.
 /*
@@ -129,8 +129,8 @@ default_alloc_pages(size_t n) {
     list_entry_t *le = &free_list;
     while ((le = list_next(le)) != &free_list) {
         struct Page *p = le2page(le, page_link);
-        if(p->property >= n){
-            if(p->property>n){
+        if(p->property >= n) {
+            if(p->property>n) {
                 struct Page *np = p+n;
                 np->property = p->property - n;
                 SetPageProperty(np);
@@ -156,29 +156,30 @@ default_free_pages(struct Page *base, size_t n) {
     base->property = n;
     list_entry_t *le = &free_list;
     struct Page * p = NULL;
-    while((le=list_next(le)) != &free_list) {p = le2page(le, page_link);
-        if(p>base){
-        break;
+    while((le=list_next(le)) != &free_list) {
+        p = le2page(le, page_link);
+        if(p > base) {
+            break;
         }
     }
     le = (p>base)? (&(p->page_link)) : (&free_list);
     list_add_before(le,&(base->page_link));
-    if (le != &free_list){
-        if( base+n == p ){
+    if (le != &free_list) {
+        if(base+n == p) {
             base->property += p->property;
             p->property = 0;
             list_del(&(p->page_link));
         }
     }
-        le = list_prev(&(base->page_link));
-        if (le!= &free_list){
-            p = le2page(le,page_link);
-            if (p+p->property == base){
-                p->property += base->property;
-                base->property = 0;
-                list_del(&(base->page_link));
-            }
+    le = list_prev(&(base->page_link));
+    if (le != &free_list) {
+        p = le2page(le,page_link);
+        if (p+p->property == base) {
+            p->property += base->property;
+            base->property = 0;
+            list_del(&(base->page_link));
         }
+    }
     nr_free += n;
     return ;
 }
