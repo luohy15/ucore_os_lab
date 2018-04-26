@@ -86,7 +86,7 @@ static struct proc_struct *
 alloc_proc(void) {
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
     if (proc != NULL) {
-    //LAB4:EXERCISE1 YOUR CODE
+    //LAB4:EXERCISE1 2015011304
     /*
      * below fields in proc_struct need to be initialized
      *       enum proc_state state;                      // Process state
@@ -102,6 +102,18 @@ alloc_proc(void) {
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
+        proc->state = PROC_UNINIT;  //设置进程为未初始化状态
+        proc->pid = -1;             //未初始化的的进程id为-1
+        proc->runs = 0;             //初始化时间片
+        proc->kstack = 0;           //内存栈的地址
+        proc->need_resched = 0;     //是否需要调度设为不需要
+        proc->parent = NULL;        //父节点设为空
+        proc->mm = NULL;            //虚拟内存设为空
+        memset(&(proc->context), 0, sizeof(struct context));//上下文的初始化
+        proc->tf = NULL;            //中断帧指针置为空
+        proc->cr3 = boot_cr3;       //页目录设为内核页目录表的基址
+        proc->flags = 0;            //标志位
+        memset(proc->name, 0, PROC_NAME_LEN);//进程名
     }
     return proc;
 }
@@ -271,7 +283,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         goto fork_out;
     }
     ret = -E_NO_MEM;
-    //LAB4:EXERCISE2 YOUR CODE
+    //LAB4:EXERCISE2 2015011304
     /*
      * Some Useful MACROs, Functions and DEFINEs, you can use them in below implementation.
      * MACROs or Functions:
@@ -296,6 +308,36 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakeup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
+    //1：调用alloc_proc()函数申请内存块，如果失败，直接返回处理
+    if ((proc = alloc_proc()) == NULL) {
+        goto fork_out;
+    }
+    //2.将子进程的父节点设置为当前进程
+    proc->parent = current;
+    //3.调用setup_stack()函数为进程分配一个内核栈
+    if (setup_kstack(proc) != 0) {
+        goto bad_fork_cleanup_proc;
+    }
+    //4.调用copy_mm()函数复制父进程的内存信息到子进程
+    if (copy_mm(clone_flags, proc) != 0) {
+        goto bad_fork_cleanup_kstack;
+    }
+    //5.调用copy_thread()函数复制父进程的中断帧和上下文信息
+    copy_thread(proc, stack, tf);
+    //6.将新进程添加到进程的hash列表中
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc); //建立映射
+        nr_process ++;  //进程数加1
+        list_add(&proc_list, &(proc->list_link));//将进程加入到进程的链表中
+    }
+    local_intr_restore(intr_flag);
+    //      7.一切就绪，唤醒子进程
+    wakeup_proc(proc);
+    //      8.返回子进程的pid
+    ret = proc->pid;
 fork_out:
     return ret;
 
