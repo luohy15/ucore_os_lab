@@ -223,11 +223,12 @@ trap_dispatch(struct trapframe *tf) {
          * (3) Too Simple? Yes, I think so!
          */
         ticks++;
-        if (ticks % TICK_NUM == 0) {
-            assert(current != NULL);
-            current->need_resched = 1;
-            // print_ticks();
-        }
+        assert(current != NULL);
+        sched_class_proc_tick(current);
+        // if (ticks % TICK_NUM == 0) {
+        //     current->need_resched = 1;
+        //     // print_ticks();
+        // }
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
