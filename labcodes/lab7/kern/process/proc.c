@@ -87,7 +87,7 @@ static struct proc_struct *
 alloc_proc(void) {
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
     if (proc != NULL) {
-    //LAB4:EXERCISE1 YOUR CODE
+    //LAB4:EXERCISE1 2015011304
     /*
      * below fields in proc_struct need to be initialized
      *       enum proc_state state;                      // Process state
@@ -103,22 +103,27 @@ alloc_proc(void) {
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
-     //LAB5 YOUR CODE : (update LAB4 steps)
-    /*
-     * below fields(add in LAB5) in proc_struct need to be initialized	
-     *       uint32_t wait_state;                        // waiting state
-     *       struct proc_struct *cptr, *yptr, *optr;     // relations between processes
-	 */
-     //LAB6 YOUR CODE : (update LAB5 steps)
-    /*
-     * below fields(add in LAB6) in proc_struct need to be initialized
-     *     struct run_queue *rq;                       // running queue contains Process
-     *     list_entry_t run_link;                      // the entry linked in run queue
-     *     int time_slice;                             // time slice for occupying the CPU
-     *     skew_heap_entry_t lab6_run_pool;            // FOR LAB6 ONLY: the entry in the run pool
-     *     uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process
-     *     uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
-     */
+        proc->state = PROC_UNINIT;  //设置进程为未初始化状态
+        proc->pid = -1;             //未初始化的的进程id为-1
+        proc->runs = 0;             //初始化时间片
+        proc->kstack = 0;           //内存栈的地址
+        proc->need_resched = 0;     //是否需要调度设为不需要
+        proc->parent = NULL;        //父节点设为空
+        proc->mm = NULL;            //虚拟内存设为空
+        memset(&(proc->context), 0, sizeof(struct context));//上下文的初始化
+        proc->tf = NULL;            //中断帧指针置为空
+        proc->cr3 = boot_cr3;       //页目录设为内核页目录表的基址
+        proc->flags = 0;            //标志位
+        memset(proc->name, 0, PROC_NAME_LEN);//进程名
+        proc->wait_state = 0;//初始化进程等待状态  
+        proc->cptr = proc->optr = proc->yptr = NULL;//进程相关指针初始化  
+        proc->rq = NULL;
+        list_init(&(proc->run_link));
+        skew_heap_init(&proc->lab6_run_pool);
+        proc->time_slice = 0;
+        proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
+        proc->lab6_stride = 0;
+        proc->lab6_priority = 0;
     }
     return proc;
 }
@@ -380,7 +385,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         goto fork_out;
     }
     ret = -E_NO_MEM;
-    //LAB4:EXERCISE2 YOUR CODE
+    //LAB4:EXERCISE2 2015011304
     /*
      * Some Useful MACROs, Functions and DEFINEs, you can use them in below implementation.
      * MACROs or Functions:
@@ -413,7 +418,36 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
 	*    update step 1: set child proc's parent to current process, make sure current process's wait_state is 0
 	*    update step 5: insert proc_struct into hash_list && proc_list, set the relation links of process
     */
-	
+    //1：调用alloc_proc()函数申请内存块，如果失败，直接返回处理
+    if ((proc = alloc_proc()) == NULL) {
+        goto fork_out;
+    }
+    //2.将子进程的父节点设置为当前进程
+    proc->parent = current;
+    assert(current->wait_state == 0);//确保当前进程正在等待
+    //3.调用setup_stack()函数为进程分配一个内核栈
+    if (setup_kstack(proc) != 0) {
+        goto bad_fork_cleanup_proc;
+    }
+    //4.调用copy_mm()函数复制父进程的内存信息到子进程
+    if (copy_mm(clone_flags, proc) != 0) {
+        goto bad_fork_cleanup_kstack;
+    }
+    //5.调用copy_thread()函数复制父进程的中断帧和上下文信息
+    copy_thread(proc, stack, tf);
+    //6.将新进程添加到进程的hash列表中
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc); //建立映射
+        set_links(proc);//将原来简单的计数改成来执行set_links函数，从而实现设置进程的相关链接         
+    }
+    local_intr_restore(intr_flag);
+    //      7.一切就绪，唤醒子进程
+    wakeup_proc(proc);
+    //      8.返回子进程的pid
+    ret = proc->pid;
 fork_out:
     return ret;
 
@@ -603,7 +637,7 @@ load_icode(unsigned char *binary, size_t size) {
     //(6) setup trapframe for user environment
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
-    /* LAB5:EXERCISE1 YOUR CODE
+    /* LAB5:EXERCISE1 2015011304
      * should set tf_cs,tf_ds,tf_es,tf_ss,tf_esp,tf_eip,tf_eflags
      * NOTICE: If we set trapframe correctly, then the user level process can return to USER MODE from kernel. So
      *          tf_cs should be USER_CS segment (see memlayout.h)
@@ -612,6 +646,11 @@ load_icode(unsigned char *binary, size_t size) {
      *          tf_eip should be the entry point of this binary program (elf->e_entry)
      *          tf_eflags should be set to enable computer to produce Interrupt
      */
+    tf->tf_cs = USER_CS;
+    tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+    tf->tf_esp = USTACKTOP;//0xB0000000
+    tf->tf_eip = elf->e_entry;//
+    tf->tf_eflags = FL_IF;
     ret = 0;
 out:
     return ret;
