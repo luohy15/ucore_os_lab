@@ -245,7 +245,7 @@ trap_dispatch(struct trapframe *tf) {
         //     current->need_resched = 1;
         //     // print_ticks();
         // }
-        /* LAB7 YOUR CODE */
+        /* LAB7 2015011304 */
         /* you should upate you lab6 code
          * IMPORTANT FUNCTIONS:
 	     * run_timer_list

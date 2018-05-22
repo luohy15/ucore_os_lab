@@ -25,7 +25,7 @@ monitor_init (monitor_t * mtp, size_t num_cv) {
 // Unlock one of threads waiting on the condition variable. 
 void 
 cond_signal (condvar_t *cvp) {
-   //LAB7 EXERCISE1: YOUR CODE
+   //LAB7 EXERCISE1: 2015011304
    cprintf("cond_signal begin: cvp %x, cvp->count %d, cvp->owner->next_count %d\n", cvp, cvp->count, cvp->owner->next_count);  
   /*
    *      cond_signal(cv) {
@@ -37,6 +37,12 @@ cond_signal (condvar_t *cvp) {
    *          }
    *       }
    */
+    if(cvp->count > 0) {  //当前存在睡眠的进程
+        cvp->owner->next_count ++; //睡眠的进程总数加一
+        up(&(cvp->sem)); //唤醒等待在cv.sem上睡眠的进程
+        down(&(cvp->owner->next)); //把自己睡眠
+        cvp->owner->next_count --; //睡醒后等待此条件的睡眠进程个数减一
+    }
    cprintf("cond_signal end: cvp %x, cvp->count %d, cvp->owner->next_count %d\n", cvp, cvp->count, cvp->owner->next_count);
 }
 
@@ -44,7 +50,7 @@ cond_signal (condvar_t *cvp) {
 // mutex and suspends calling thread on conditional variable after waking up locks mutex. Notice: mp is mutex semaphore for monitor's procedures
 void
 cond_wait (condvar_t *cvp) {
-    //LAB7 EXERCISE1: YOUR CODE
+    //LAB7 EXERCISE1: 2015011304
     cprintf("cond_wait begin:  cvp %x, cvp->count %d, cvp->owner->next_count %d\n", cvp, cvp->count, cvp->owner->next_count);
    /*
     *         cv.count ++;
@@ -55,5 +61,12 @@ cond_wait (condvar_t *cvp) {
     *         wait(cv.sem);
     *         cv.count --;
     */
+    cvp->count++; //需要睡眠的进程个数加一
+    if(cvp->owner->next_count > 0)
+        up(&(cvp->owner->next)); //唤醒进程链表中的下一个进程
+    else
+        up(&(cvp->owner->mutex)); //否则唤醒睡在monitor.mutex上的进程
+    down(&(cvp->sem)); //将自己睡眠
+    cvp->count --; //睡醒后等待此条件的睡眠进程个数减一
     cprintf("cond_wait end:  cvp %x, cvp->count %d, cvp->owner->next_count %d\n", cvp, cvp->count, cvp->owner->next_count);
 }
