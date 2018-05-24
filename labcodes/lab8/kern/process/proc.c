@@ -458,7 +458,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    6. call wakeup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
 
-	//LAB5 YOUR CODE : (update LAB4 steps)
+	//LAB5 2015011304 : (update LAB4 steps)
    /* Some Functions
     *    set_links:  set the relation links of process.  ALSO SEE: remove_links:  lean the relation links of process 
     *    -------------------
@@ -475,6 +475,9 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //3.调用setup_stack()函数为进程分配一个内核栈
     if (setup_kstack(proc) != 0) {
         goto bad_fork_cleanup_proc;
+    }
+    if(copy_files(clone_flags, proc) != 0) {//add for LAB8
+        goto bad_fork_cleanup_kstack;
     }
     //4.调用copy_mm()函数复制父进程的内存信息到子进程
     if (copy_mm(clone_flags, proc) != 0) {
