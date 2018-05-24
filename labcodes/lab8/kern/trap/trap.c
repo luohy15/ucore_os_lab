@@ -239,7 +239,7 @@ trap_dispatch(struct trapframe *tf) {
 	     * sched_class_proc_tick
          */         
         ticks++;
-        // assert(current != NULL);
+        assert(current != NULL);
         // sched_class_proc_tick(current);
         // if (ticks % TICK_NUM == 0) {
         //     current->need_resched = 1;
